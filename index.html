@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Image Inspector</title>
+    <!-- Load Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Use Inter font family -->
+    <style>
+        /* This large instruction block will disappear when run on Netlify, but is helpful if opened directly */
+        .instruction-box {
+            background-color: #4f46e5;
+            color: white;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            font-weight: 700;
+        }
+        
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            /* Using a subtle dark background that works well with the card */
+            background-color: #1f2937; /* Gray-800 */
+        }
+        /* Styling the Markdown output area for better readability */
+        .output-markdown h1, .output-markdown h2, .output-markdown h3 {
+            font-weight: 700;
+            margin-top: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: #4f46e5; /* Indigo-600 */
+        }
+        .output-markdown p {
+            margin-bottom: 0.75rem;
+        }
+        .output-markdown ul, .output-markdown ol {
+            list-style-type: disc;
+            margin-left: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        /* Custom scrollbar style for the result area */
+        #output-area::-webkit-scrollbar {
+            width: 8px;
+        }
+        #output-area::-webkit-scrollbar-thumb {
+            background-color: #4b5563; /* Gray-600 */
+            border-radius: 4px;
+        }
+        #output-area::-webkit-scrollbar-track {
+            background-color: #374151; /* Gray-700 */
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 sm:p-8 flex items-center justify-center">
+
+    <div class="w-full max-w-4xl bg-gray-900 p-6 sm:p-10 rounded-2xl shadow-2xl border border-indigo-900/50">
+        <h1 class="text-3xl sm:text-4xl font-extrabold text-white mb-2 text-center">
+            <span class="text-indigo-400">Gemini</span> Image Inspector
+        </h1>
+        <p class="text-center text-gray-400 mb-8 text-lg">
+            Multimodal Analysis with AI
+        </p>
+
+        <!-- Main Grid Layout -->
+        <div class="grid lg:grid-cols-2 gap-8">
+            <!-- Left Column: Inputs -->
+            <div class="space-y-6">
+                
+                <!-- Image Input and Preview -->
+                <div>
+                    <label for="image-upload" class="block text-sm font-semibold text-gray-300 mb-2">1. Upload Image File</label>
+                    <input type="file" id="image-upload" accept="image/*" class="w-full text-sm text-gray-300
+                        file:mr-4 file:py-2 file:px-4
+                        file:rounded-full file:border-0
+                        file:text-sm file:font-semibold
+                        file:bg-indigo-600 file:text-white
+                        hover:file:bg-indigo-700 cursor-pointer rounded-xl border border-indigo-500/50 p-2 bg-gray-800">
+                    
+                    <div id="image-preview-container" class="mt-4 hidden justify-center border-4 border-dashed border-gray-600 rounded-xl p-2 bg-gray-800">
+                        <img id="image-preview" class="max-h-64 w-full object-contain rounded-lg shadow-xl" alt="Image preview">
+                    </div>
+                </div>
+
+                <!-- Prompt Input -->
+                <div>
+                    <label for="prompt-input" class="block text-sm font-semibold text-gray-300 mb-2">2. Enter Your Question</label>
+                    <textarea id="prompt-input" rows="4" placeholder="What specific objects, actions, or themes are present? Give a detailed analysis."
+                        class="w-full p-4 border border-gray-600 rounded-xl bg-gray-800 text-white focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 shadow-inner"></textarea>
+                </div>
+                
+                <!-- Action Button -->
+                <button id="analyze-button" onclick="analyzeImage()"
+                    class="w-full py-3 px-4 bg-indigo-600 text-white font-extrabold rounded-xl shadow-xl hover:bg-indigo-700 transition duration-300 transform hover:scale-[1.01] flex items-center justify-center disabled:opacity-40 disabled:scale-100"
+                    disabled>
+                    <span id="button-text">Analyze Image</span>
+                    <!-- Loading Spinner -->
+                    <svg id="loading-spinner" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Right Column: Result Area -->
+            <div>
+                <h2 class="text-xl font-bold text-white mb-3 flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    AI Generated Report
+                </h2>
+                
+                <!-- Error Message Box -->
+                <div id="error-message-box" class="mb-4 p-3 bg-red-800 border border-red-600 text-red-300 rounded-lg hidden" role="alert">
+                    <p id="error-text" class="font-medium"></p>
+                </div>
+
+                <!-- Analysis Result Output -->
+                <div id="output-area" class="output-markdown min-h-[300px] max-h-[500px] overflow-y-auto 
+                                             bg-gray-800 p-5 border border-gray-700 rounded-xl text-gray-200 
+                                             shadow-inner whitespace-pre-wrap transition duration-300">
+                    The detailed analysis will appear here after the AI processes your image and question.
+                </div>
+            </div>
+        </div>
+        
+        <footer class="mt-8 text-center text-sm text-gray-500 pt-4 border-t border-gray-800">
+            <p>Powered by the Gemini 2.5 Flash model for fast multimodal understanding.</p>
+        </footer>
+
+    </div>
+
+    <script type="module">
+        // Import necessary Firebase functions (required for the environment, even if not used by the app logic)
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        // Global variables provided by the environment (MANDATORY TO USE)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // --- Firebase Initialization (Required for Environment) ---
+        let auth = null;
+        if (Object.keys(firebaseConfig).length > 0) {
+            try {
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                setLogLevel('Debug');
+                if (initialAuthToken) {
+                    signInWithCustomToken(auth, initialAuthToken).catch(err => console.error("Custom token sign-in failed:", err));
+                } else {
+                    signInAnonymously(auth).catch(err => console.error("Anonymous sign-in failed:", err));
+                }
+            } catch (e) {
+                console.error("Firebase initialization failed:", e);
+                // Continue application execution without full Firebase features
+            }
+        }
+        // --- End Firebase Initialization ---
+
+        // DOM elements
+        const imageUpload = document.getElementById('image-upload');
+        const imagePreview = document.getElementById('image-preview');
+        const previewContainer = document.getElementById('image-preview-container');
+        const promptInput = document.getElementById('prompt-input');
+        const analyzeButton = document.getElementById('analyze-button');
+        const outputArea = document.getElementById('output-area');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const buttonText = document.getElementById('button-text');
+        const errorMessageBox = document.getElementById('error-message-box');
+        const errorText = document.getElementById('error-text');
+
+        let base64ImageData = null;
+
+        // Function to display errors (using the custom message box)
+        function displayError(message) {
+            errorText.textContent = message;
+            errorMessageBox.classList.remove('hidden');
+        }
+
+        // Function to clear errors
+        function clearError() {
+            errorMessageBox.classList.add('hidden');
+            errorText.textContent = '';
+        }
+
+        // Event listener for file upload to show preview and enable button
+        imageUpload.addEventListener('change', (event) => {
+            clearError();
+            base64ImageData = null; 
+            const file = event.target.files[0];
+
+            if (file) {
+                // Show image preview
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    imagePreview.src = e.target.result;
+                    previewContainer.classList.remove('hidden', 'justify-center');
+                    previewContainer.classList.add('flex');
+                };
+                reader.readAsDataURL(file);
+
+                // Convert file to base64 for API payload
+                const base64Reader = new FileReader();
+                base64Reader.onload = function(e) {
+                    const parts = e.target.result.split(',');
+                    if (parts.length > 1) {
+                         base64ImageData = parts[1];
+                         analyzeButton.disabled = false;
+                    } else {
+                        displayError("Could not process image file.");
+                        analyzeButton.disabled = true;
+                    }
+                };
+                base64Reader.onerror = () => {
+                    displayError("Error reading image file.");
+                    analyzeButton.disabled = true;
+                };
+                base64Reader.readAsDataURL(file);
+            } else {
+                imagePreview.src = '';
+                previewContainer.classList.add('hidden');
+                analyzeButton.disabled = true;
+            }
+        });
+
+        // Global function to call from HTML button
+        window.analyzeImage = async function() {
+            if (!base64ImageData) {
+                displayError("Please upload an image before analyzing.");
+                return;
+            }
+
+            const prompt = promptInput.value.trim() || "Describe this image in detail.";
+            clearError();
+
+            // UI state: start loading
+            analyzeButton.disabled = true;
+            loadingSpinner.classList.remove('hidden');
+            buttonText.textContent = 'Analyzing...';
+            outputArea.innerHTML = '<p class="text-gray-400">Processing image, please wait...</p>';
+
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+            const payload = {
+                contents: [
+                    {
+                        role: "user",
+                        parts: [
+                            { text: prompt },
+                            {
+                                inlineData: {
+                                    mimeType: imageUpload.files[0].type, 
+                                    data: base64ImageData
+                                }
+                            }
+                        ]
+                    }
+                ],
+            };
+
+            const MAX_RETRIES = 5;
+            for (let i = 0; i < MAX_RETRIES; i++) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        const errorBody = await response.json();
+                        // Non-retryable error if status is 4xx (except 429 for rate limit)
+                        if (response.status >= 400 && response.status !== 429) {
+                            throw new Error(`API returned status ${response.status}: ${errorBody.error?.message || 'Unknown error'}`);
+                        }
+                    }
+
+                    const result = await response.json();
+                    const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                    if (text) {
+                        // Simple Markdown to HTML conversion for structure
+                        let htmlText = text
+                            .replace(/### (.*)/g, '<h3>$1</h3>')
+                            .replace(/## (.*)/g, '<h2>$1</h2>')
+                            .replace(/\* (.*)/g, '<li>$1</li>') // Simple list conversion
+                            .replace(/\n\n/g, '<p></p>'); // Paragraph breaks
+                        
+                        // Wrap list items in <ul> tags (very basic, but works)
+                        htmlText = htmlText.replace(/<\/li><p><\/p><li>/g, '</li><li>');
+                        if (htmlText.includes('<li>')) {
+                            htmlText = '<ul>' + htmlText.replace(/<li>/g, '</ul><ul><li>') + '</ul>';
+                            // Clean up double ul tags
+                            htmlText = htmlText.replace(/<\/ul><ul>/g, '').replace(/^<ul>|<\/ul>$/g, ''); 
+                        }
+                        
+                        outputArea.innerHTML = htmlText;
+                    } else {
+                        outputArea.innerHTML = "<p class='text-red-400'>Analysis failed: Could not extract text from API response.</p>";
+                    }
+                    return; // Success, exit the function
+
+                } catch (error) {
+                    console.error(`Attempt ${i + 1} failed:`, error);
+                    if (i === MAX_RETRIES - 1) {
+                        displayError(`Analysis failed after ${MAX_RETRIES} attempts. Please check your network connection and server setup.`);
+                        outputArea.innerHTML = '<p class="text-red-400">Final error during analysis. Check the console for details.</p>';
+                    } else {
+                        // Exponential backoff
+                        const delay = Math.pow(2, i) * 1000 + (Math.random() * 500); 
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    }
+                } finally {
+                    // UI state: stop loading on final attempt or success
+                    if (i === MAX_RETRIES - 1 || outputArea.innerHTML !== '<p class="text-gray-400">Processing image, please wait...</p>') {
+                        analyzeButton.disabled = false;
+                        loadingSpinner.classList.add('hidden');
+                        buttonText.textContent = 'Analyze Image';
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
